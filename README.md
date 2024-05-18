@@ -30,7 +30,7 @@ import noisereduce as nr
 
 ### Загрузка датасета и подготовка данных
 
-Загружаем датасет из CSV-файла в DataFrame.
+Загружаем датасет из CSV-файла в DataFrame. Поля в датасете: корректность (0 или 1), текст переговора.
 
 ```python
 df = pd.read_csv('augmented_dataset.csv', sep=';', names=['Correct', 'Dialogue'])
