@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>АудиоКонтроль</title>
+    <link rel="shortcut icon" href="/static/лого.png">
+    <link rel="stylesheet" type="text/css" href="./static/style.css">
+    <link rel="icon" href="./static/icon.ico" type="image/x-icon">
+    <style>
+        .highlight {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div id="head">
+            <img src="./static/logo.png" width="20%">
+            <div>
+                <p style="color: white; font-size: 180%; font-weight: bold; ">АудиоКонтроль</p>
+            <hr>
+            </div>
+        </div>
+    </header>
+    <main>
+        <div class="container">
+            <p class="Description">Сервис для работы с аудиофайлами. Загрузите свой аудиофайл и определите есть ли нарушения регламента.</p>
+            <h2>Загрузите аудиофайл</h2>
+            <input type="file" accept="audio/mp3" id="audioFile">
+            <div id="dfbtn">
+                <button onclick="uploadAudio()" id="detectButton">Определить</button>
+            </div>
+            <div>
+                <p id="result"></p>
+                <img id="loadingGif" src="./static/load.gif" style="display: none;" alt="Loading...">
+            </div>
+        </div>
+        
+    </main>
+    <footer>
+        <p> 2024 АудиоКонтроль &copy; Котограммисты</p>
+    </footer>
+    <script>
+        // Загрузка аудио
+        function uploadAudio() 
+        {
+            var fileInput = document.getElementById('audioFile');
+            
+            // Проверка, загружен ли файл
+            if (!fileInput.files.length) 
+            {
+                var resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = "Файл не загружен!";
+                return;
+            }
+            
+            var file = fileInput.files[0];
+            
+            // Проверяем формат файла
+            if (!file.name.toLowerCase().endsWith('.mp3')) 
+            {
+                var resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = "Поддерживается только mp3-формат!";
+                return; // Прерываем выполнение функции, чтобы не отправлять запрос
+            }
+            
+            // Отображение гиф (загрузки)
+            document.getElementById('loadingGif').style.display = 'block';
+            
+            var formData = new FormData();
+            formData.append('file', file);
+    
+            fetch('/predict', 
+            {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => 
+            {
+                var resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = data.result; // Вывод результата
+                
+                // Скрытие гиф (загрузки)
+                document.getElementById('loadingGif').style.display = 'none';
+            })
+            .catch(error => 
+            {
+                console.error('Error:', error);
+
+                // Скрытие гиф (загрузки)
+                document.getElementById('loadingGif').style.display = 'none';
+            });
+        }
+    </script>    
+</body>
+</html>
