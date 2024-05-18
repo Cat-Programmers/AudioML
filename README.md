@@ -5,7 +5,13 @@
 
 ### Импорт библиотек
 
-Импортируем все нужные для нас библиотеки.
+Скачиваем все нужные для нас библиотеки.
+
+```
+pip install flask pandas scikit-learn numpy soundfile librosa speech_recognition noisereduce
+```
+
+Импортируем библиотеки.
 
 ```python
 from flask import Flask, request, jsonify, send_file, send_from_directory
