@@ -8,13 +8,17 @@
 Скачиваем все нужные для нас библиотеки.
 
 ```
-pip install flask pandas scikit-learn numpy soundfile librosa SpeechRecognition noisereduce
+pip install flask pandas scikit-learn numpy soundfile librosa nltk scipy
 ```
 
-Импортируем библиотеки.
+```
+pip install -U openai-whisper
+```
+
+Импортируем библиотеки и загружаем модель распознавания голоса.
 
 ```python
-from flask import Flask, request, jsonify, send_file, send_from_directory
+from flask import Flask, request, jsonify, send_file
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -24,8 +28,14 @@ import numpy as np
 import soundfile as sf
 import os
 import librosa
-import speech_recognition as sr
-import noisereduce as nr
+import librosa.display
+import scipy.io.wavfile as wavfile
+import nltk
+from nltk.corpus import stopwords
+import whisper
+
+model_name = 'large'
+model_whisper = whisper.load_model(model_name)
 ```
 
 ### Загрузка датасета и подготовка данных
@@ -83,16 +93,9 @@ if not os.path.exists(AUDIO_FOLDER):
 
 ```python
 def transcribe_audio(audio_file):
-    recognizer = sr.Recognizer()
-    with sr.AudioFile(audio_file) as source:
-        audio_data = recognizer.record(source)
-        try:
-            text = recognizer.recognize_google(audio_data, language="ru-RU")
-            return text
-        except sr.UnknownValueError:
-            return "Не удалось распознать речь"
-        except sr.RequestError as e:
-            return f"Ошибка запроса к сервису распознавания речи: {e}"
+    result = model_whisper.transcribe(audio_file)
+    cleaned_text = result["text"].replace("Продолжение следует...", "")
+    return cleaned_text
 ```
 
 Метод для конвертации аудиофайлов в WAV-формат.
@@ -116,14 +119,72 @@ def remove_noise(audio_path):
     base_name, ext = os.path.splitext(audio_path)
     output_path = base_name + '.wav'
 
-    # Загрузка аудиофайла с помощью librosa
-    audio_data, sr = librosa.load(audio_path, sr=None)
+    sr, y = wavfile.read(audio_path)
+    y = y.astype(np.float32) / 32767
 
-    # Применение метода noisereduce для удаления шума
-    reduced_noise = nr.reduce_noise(y=audio_data, sr=sr)
+    # Параметры анализа
+    win_len_sec = 0.02  # Длина окна в секундах
+    hop_frac = 0.5      # Доля перекрытия окон
+    win_len = int(win_len_sec * sr)
+    hop_size = int(win_len * hop_frac)
+
+    # Определение участка шума
+    window_length = 2048
+    hop_length = 512
+    rms = librosa.feature.rms(y=y, frame_length=window_length, hop_length=hop_length)
+    rms_threshold = np.percentile(rms, 10)  # Используем 10-й перцентиль для определения шума
+    noise_indices = np.where(rms[0] < rms_threshold)[0]
+
+    # Извлечение шума
+    noise_start = noise_indices[0] * hop_length
+    noise_end = (noise_indices[-1] + 1) * hop_length
+    noise = y[noise_start:noise_end]
+
+    # Вычисление спектрограммы
+    S_full, phase = librosa.magphase(librosa.stft(y))
+
+    # Определение среднего шума по частотам
+    noise_stft = librosa.stft(noise)
+    noise_mag = np.abs(noise_stft)
+    mean_noise_mag = np.mean(noise_mag, axis=1, keepdims=True)
+
+    # Удаление шума (метод спектрального вычитания)
+    S_denoised = S_full - mean_noise_mag
+    S_denoised = np.maximum(S_denoised, 0)  # Убираем отрицательные значения
+
+    # Обратное преобразование в звуковой сигнал
+    clean_signal = librosa.istft(S_denoised * phase)
+
+    # Нормализация и сохранение нового аудиофайла
+    clean_signal = np.int16(clean_signal / np.max(np.abs(clean_signal)) * 32767)
 
     # Сохранение очищенного аудиофайла
-    sf.write(output_path, reduced_noise, sr)
+    sf.write(output_path, clean_signal, sr)
+
+    return output_path
+```
+
+Метод для увеличения громкости голоса в аудиофайле.
+
+```python
+def voice_amplification(audio_path):
+    base_name, ext = os.path.splitext(audio_path)
+    output_path = base_name + '.wav'
+    
+    sr, y = wavfile.read(audio_path)
+    y = y.astype(np.float32) / 32767  # Нормализация сигнала
+
+    gain = 1.7
+    y_amplified = y * gain
+
+    # Обрезка значений, чтобы избежать клиппинга
+    y_amplified = np.clip(y_amplified, -1.0, 1.0)
+
+    # Обратная нормализация и сохранение аудиофайла
+    y_amplified = np.int16(y_amplified * 32767)
+
+    # Сохранение очищенного аудиофайла
+    sf.write(output_path, y_amplified, sr)
 
     return output_path
 ```
@@ -159,12 +220,17 @@ def predict_audio():
     if file:
         audio_file_path = convert_to_wav(file.filename)
         denoised_audio_file_path = remove_noise(audio_file_path)
-        transcribed_text = transcribe_audio(denoised_audio_file_path)
+        amplification_audio_file_path =voice_amplification(denoised_audio_file_path)
+        transcribed_text = transcribe_audio(amplification_audio_file_path)
         new_text_vectorized = vectorizer.transform([transcribed_text])
         prediction = model.predict(new_text_vectorized)
         if prediction[0] == 1:
             result = "Нарушений не обнаружено: " + new_text_vectorized.toarray().tolist() 
         else:
+            # Загружаем стоп-слова
+            nltk.download('stopwords')
+            stop_words = set(stopwords.words('russian'))
+
             # Получаем список признаков и коэффициенты модели
             feature_names = vectorizer.get_feature_names_out()
             coefs = model.coef_[0]
@@ -180,9 +246,8 @@ def predict_audio():
 
             # Проходимся по каждому слову в тексте
             for word in words:
-                # Если слово является негативным, выделяем его звездочками
-                if word in negative_influence_words:
-                    highlighted_words.append(f"*{word}*")
+                if word in negative_influence_words and word.lower() not in stop_words:
+                    highlighted_words.append(f"<span class='highlight'>{word}</span>")
                 else:
                     highlighted_words.append(word)
 
