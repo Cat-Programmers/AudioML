@@ -28,7 +28,6 @@ import noisereduce as nr
 
 ```python
 df = pd.read_csv('augmented_dataset.csv', sep=';', names=['Correct', 'Dialogue'])
-df
 ```
 
 Разделяем данные на тестовые и тренировочные, а также производим токенизацию и векторизацию текста.
