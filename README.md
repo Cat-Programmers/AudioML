@@ -8,7 +8,7 @@
 Скачиваем все нужные для нас библиотеки.
 
 ```
-pip install flask pandas scikit-learn numpy soundfile librosa speech_recognition noisereduce
+pip install flask pandas scikit-learn numpy soundfile librosa SpeechRecognition noisereduce
 ```
 
 Импортируем библиотеки.
