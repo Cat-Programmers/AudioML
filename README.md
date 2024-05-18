@@ -1,7 +1,7 @@
 # Анализ служебных переговоров
 ### Импорт библиотек
 
-Импортируем все нужные для нас библиотеки
+Импортируем все нужные для нас библиотеки.
 
 ```python
 from flask import Flask, request, jsonify, send_file, send_from_directory
@@ -20,12 +20,16 @@ import noisereduce as nr
 
 ### Загрузка датасета и подготовка данных
 
-```
+Загружаем датасет из CSV-файла в DataFrame.
+
+```python
 df = pd.read_csv('augmented_dataset.csv', sep=';', names=['Correct', 'Dialogue'])
 df
 ```
 
-```
+Разделяем данные на тестовые и тренировочные, а также производим токенизацию и векторизацию текста.
+
+```python
 # Разделение на тестовые и тренировочные данные
 train_df, test_df = train_test_split(df, test_size=0.2, random_state=42)
 
@@ -39,13 +43,17 @@ y_test = test_df['Correct']
 
 ### Создание и обучение модели
 
-```
+Мы будем использовать модель логистической регрессии. **Модель логистической регрессии** - модель для бинарной классификации.
+
+```python
 # Создание и обучение модели
 model = LogisticRegression()
 model.fit(X_train, y_train)
 ```
 
-```
+Оцениваем производительность модели с помощью метрики classification_report.
+
+```python
 # Оценка модели
 y_pred = model.predict(X_test)
 print(classification_report(y_test, y_pred))
@@ -53,14 +61,18 @@ print(classification_report(y_test, y_pred))
 
 ### Методы для работы с аудиофайлами 
 
-```
+Создаем путь для сохранения временных аудиофайорв.
+
+```python
 # Путь для сохранения временного аудиофайла
 AUDIO_FOLDER = 'temp_audio'
 if not os.path.exists(AUDIO_FOLDER):
     os.makedirs(AUDIO_FOLDER)
 ```
 
-```
+Метод для транскрибизации аудио (получение текста из аудио).
+
+```python
 def transcribe_audio(audio_file):
     recognizer = sr.Recognizer()
     with sr.AudioFile(audio_file) as source:
@@ -74,7 +86,9 @@ def transcribe_audio(audio_file):
             return f"Ошибка запроса к сервису распознавания речи: {e}"
 ```
 
-```
+Метод для конвертации аудиофайлов в WAV-формат.
+
+```python
 def convert_to_wav(input_file):
     base_name, ext = os.path.splitext(input_file)
     if ext != '.wav':
@@ -86,7 +100,9 @@ def convert_to_wav(input_file):
         return input_file
 ```
 
-```
+Метод для удаления шума ищ аудиофайла.
+
+```python
 def remove_noise(audio_path):
     base_name, ext = os.path.splitext(audio_path)
     output_path = base_name + '.wav'
@@ -105,18 +121,24 @@ def remove_noise(audio_path):
 
 ### Создание и запуск приложения
 
-```
+Создаем Flask-приложение
+
+```python
 app = Flask(__name__)
 ```
 
-```
+Определяем путь, из которого будет загружаться HTML-файл (главная страница приложения).
+
+```python
 # Определение пути для загрузки HTML-файла
 @app.route('/')
 def index():
     return send_file('index.html')
 ```
 
-```
+Команда для предсказания на наличие нарушения и вывода текста. Если текст содержит нарушение, то звездочками будут выделяться слова, которые и вызвали нарушение, а если текст не содержит нарушение, то просто будет выведен текст.
+
+```python
 # Предсказание на наличие нарушения и вывод текста
 @app.route('/predict', methods=['POST'])
 def predict_audio():
@@ -162,7 +184,9 @@ def predict_audio():
         return jsonify({'result': result})
 ```
 
-```
+Запуск сервера на локальном хосте. Для подключения к сайту требуется перейти по одной из ссылок, которые будут выведены в терминал.
+
+```python
 # Запуск сервера на локальном хосте
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
