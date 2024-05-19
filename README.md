@@ -32,6 +32,8 @@ import librosa.display
 import scipy.io.wavfile as wavfile
 import nltk
 from nltk.corpus import stopwords
+import webbrowser
+from threading import Timer
 import whisper
 
 model_name = 'large'
@@ -258,10 +260,18 @@ def predict_audio():
         return jsonify({'result': result})
 ```
 
+Открытие главной страницы (index.html).
+
+```python
+def open_browser():
+    webbrowser.open_new('http://127.0.0.1:5000/')
+```
+
 Запуск сервера на локальном хосте. Для подключения к сайту требуется перейти по одной из ссылок, которые будут выведены в терминал.
 
 ```python
 # Запуск сервера на локальном хосте
 if __name__ == '__main__':
+    Timer(1, open_browser).start()
     app.run(host='0.0.0.0', port=5000)
 ```
